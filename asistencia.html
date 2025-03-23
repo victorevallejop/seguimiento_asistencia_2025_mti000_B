@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Seguimiento de Asistencia</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+            min-width: 850px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+        }
+        .student-info, .course-info {
+            width: 48%;
+            background: #e8f0fe;
+            padding: 15px;
+            border-radius: 10px;
+        }
+        .charts {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            min-width: 800px;
+            margin-top: 20px;
+        }
+        .chart-container-circle, .chart-container-bar {
+            min-width: 400px;
+            height: auto;
+        }
+        .chart-container-circle { width: 36%; max-width: 400px; }
+        .chart-container-bar { width: 60%; max-width: 1200px; }
+        #attendanceChart { width: 350px !important; height: 350px !important; }
+        #historicalChart { width: 100%; max-height: 350px; }
+        .search {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="search">
+            <input type="email" id="emailInput" placeholder="Ingrese correo institucional">
+            <button onclick="buscarEstudiante()">Buscar</button>
+        </div>
+        <div class="header">
+            <div class="student-info" id="studentInfo">
+                <h3>Datos del Estudiante</h3>
+                <p><strong>Nombre:</strong> -</p>
+                <p><strong>ROL USM:</strong> -</p>
+                <p><strong>RUT:</strong> -</p>
+                <p><strong>Correo:</strong> -</p>
+                <p><strong>Carrera:</strong> -</p>
+                <p><strong>Universidad:</strong> -</p>
+            </div>
+            <div class="course-info" id="courseInfo">
+                <h3>Resumen de Asistencia</h3>
+                <p><strong>Nro de Clases Totales:</strong> -</p>
+                <p><strong>Nro de Clases Asistidas:</strong> -</p>
+                <p><strong>Porcentaje de Asistencia:</strong> -</p>
+                <p><strong>Comportamiento futuro:</strong> -</p>
+                <p><strong>Riesgo:</strong> -</p>
+            </div>
+        </div>
+        <div class="charts">
+            <div class="chart-container-circle">
+                <h3>Distribución de Asistencias</h3>
+                <canvas id="attendanceChart"></canvas>
+            </div>
+            <div class="chart-container-bar">
+                <h3>Histórico de Asistencia</h3>
+                <canvas id="historicalChart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        var ctx1 = document.getElementById('attendanceChart').getContext('2d');
+        var attendanceChart = new Chart(ctx1, {
+            type: 'doughnut',
+            data: {
+                labels: ['Asistencias', 'Ausencias'],
+                datasets: [{ data: [0, 0], backgroundColor: ['#4CAF50', '#FF5733'] }]
+            }
+        });
+
+        var ctx2 = document.getElementById('historicalChart').getContext('2d');
+        var historicalChart = new Chart(ctx2, {
+            type: 'bar',
+            data: {
+                labels: [],
+                datasets: [{ label: 'Asistencia', data: [], backgroundColor: '#4CAF50' }]
+            },
+            options: { maintainAspectRatio: false, responsive: true, scales: { y: { beginAtZero: true } } }
+        });
+
+     // Función para obtener parámetros de la URL
+    function obtenerParametroURL(nombre) {
+        const params = new URLSearchParams(window.location.search);
+        return params.get(nombre);
+    }
+
+    // Función para cargar automáticamente los datos si el correo está en la URL
+    window.onload = function () {
+        const email = obtenerParametroURL('email');
+        if (email) {
+            document.getElementById('emailInput').value = email; // Mostrar en el input
+            buscarEstudiante(email); // Llamar automáticamente a la función
+        }
+    };
+
+async function buscarEstudiante(emailParam = null) {
+    const email = emailParam || document.getElementById('emailInput').value;
+    if (!email) return alert("Ingrese un correo válido");
+
+    try {
+        // 📌 1️⃣ Hacer UNA sola petición a la API
+        const response = await fetch(`https://script.google.com/macros/s/AKfycby9gyX-Z6ou4Rf9U4DckoJ4vHdlwem2giJd_dtOH-uu5QS3rVoQR1xlBwxSMw0rBveR-g/exec?email=${email}`);
+        const data = await response.json();
+        console.log("Datos recibidos:", data); // Depuración
+
+        // 📌 2️⃣ Validar si hay un error en la respuesta
+        if (!data || data.error) {
+            alert("Estudiante no encontrado o datos incorrectos.");
+            return;
+        }
+
+        // 📌 3️⃣ Actualizar información del estudiante en el HTML
+        document.getElementById("studentInfo").innerHTML = `
+            <h3>Datos del Estudiante</h3>
+            <p><strong>Nombre:</strong> ${data.nombre}</p>
+            <p><strong>ROL USM:</strong> ${data.rol}</p>
+            <p><strong>RUT:</strong> ${data.rut}</p>
+            <p><strong>Correo:</strong> ${data.correo}</p>
+            <p><strong>Carrera:</strong> ${data.carrera}</p>
+            <p><strong>Universidad:</strong> ${data.universidad}</p>`;
+
+        document.getElementById("courseInfo").innerHTML = `
+            <h3>Resumen de Asistencia</h3>
+            <p><strong>Nro de Clases Totales:</strong> ${data.clasesTotales}</p>
+            <p><strong>Nro de Clases Asistidas:</strong> ${data.clasesAsistidas}</p>
+            <p><strong>Porcentaje de Asistencia:</strong> ${data.porcentajeAsistencia}</p>
+            <p><strong>Comportamiento futuro:</strong> ${data.comportamientoFuturo}</p>
+            <p><strong>Riesgo:</strong> ${data.riesgo}</p>`;
+
+        // 📌 4️⃣ Validar y actualizar el gráfico de asistencia (torta)
+        if (data.clasesTotales !== undefined && data.clasesAsistidas !== undefined) {
+            attendanceChart.data.datasets[0].data = [data.clasesAsistidas, data.clasesTotales - data.clasesAsistidas];
+            attendanceChart.update();
+        } else {
+            console.warn("⚠️ Datos de asistencia no válidos.");
+        }
+
+        // 📌 5️⃣ Validar y actualizar el gráfico de barras (histórico de asistencia)
+        if (data.historicoFechas && Array.isArray(data.historicoFechas) && data.historicoFechas.length > 0 &&
+            data.historicoAsistencias && Array.isArray(data.historicoAsistencias) && data.historicoAsistencias.length > 0) {
+
+            historicalChart.data.labels = data.historicoFechas;
+            historicalChart.data.datasets[0].data = data.historicoAsistencias;
+            historicalChart.update();
+        } else {
+            console.warn("⚠️ No hay datos históricos de asistencia.");
+        }
+
+    } catch (error) {
+        console.error("❌ Error al obtener datos:", error);
+        alert("Hubo un problema al obtener la información del estudiante.");
+    }
+}
+
+
+
+// Ejecutar automáticamente si el correo está en la URL
+window.onload = function () {
+    const email = obtenerParametroURL('email');
+    if (email) {
+        document.getElementById('emailInput').value = email;
+        buscarEstudiante(email);
+    }
+};
+
+    </script>
+</body>
+</html>
