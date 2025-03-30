@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Informe de Asistencia del Curso</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f8f9fa;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .tabla-wrapper {
+      overflow-x: auto;
+      position: relative;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      min-width: 1000px;
+      background: white;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    th, td {
+      padding: 6px 8px;
+      border: 1px solid #ddd;
+      text-align: center;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    th {
+      background-color: #0c4c7d;
+      color: white;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    th.sticky-col, td.sticky-col {
+      position: sticky;
+      left: 0;
+      background: #f1f1f1;
+      z-index: 3;
+    }
+    th.sticky-col-2, td.sticky-col-2 {
+      position: sticky;
+      left: 160px;
+      background: #f1f1f1;
+      z-index: 2;
+    }
+    .asistencia-si {
+      color: green;
+      font-weight: bold;
+    }
+    .asistencia-no {
+      color: red;
+      font-weight: bold;
+    }
+    .footer {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 11px;
+      color: #666;
+    }
+    @media print {
+      body { background: white; }
+      .footer { display: none; }
+      .tabla-wrapper { overflow: visible; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Informe de Asistencia del Curso</h1>
+  <div class="tabla-wrapper" id="tablaWrapper">
+    <table id="tablaAsistencia">
+      <thead id="cabeceraTabla"></thead>
+      <tbody id="cuerpoTabla"></tbody>
+    </table>
+  </div>
+  <div class="footer">Generado automáticamente desde Google Sheets</div>
+
+  <script>
+    async function cargarDatos() {
+      try {
+        const response = await fetch("https://script.google.com/macros/s/AKfycbxHGFj3Z88Ij_ECW1lKOZDXSYCBJ5x1AIHRMBOPMVMfWkriIZqgwpL0xHcA5EAlpDFj/exec?action=asistenciaCurso");
+        const data = await response.json();
+
+        // Filtrar clases pasadas (basado en fecha actual)
+        const hoy = new Date();
+        const clasesFiltradas = [];
+        const indicesValidos = [];
+
+        data.clases.forEach((clase, i) => {
+          const fechaTexto = clase.split(" ")[0];
+          const [dia, mes] = fechaTexto.split("-");
+          const fechaClase = new Date(hoy.getFullYear(), parseInt(mes)-1, parseInt(dia));
+          if (fechaClase <= hoy) {
+            clasesFiltradas.push(clase);
+            indicesValidos.push(i);
+          }
+        });
+
+        // Ordenar estudiantes por Apellido Paterno, Materno, Nombres
+        data.estudiantes.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+
+        // Calcular % de asistencia considerando solo clases ya realizadas
+        data.estudiantes.forEach(est => {
+          let asistenciasValidas = indicesValidos.map(i => est.asistencias[i]);
+          let total = asistenciasValidas.filter(x => x).length;
+          let porcentaje = (total / clasesFiltradas.length) * 100;
+          est.filtradas = asistenciasValidas;
+          est.porcentaje = isNaN(porcentaje) ? "0%" : porcentaje.toFixed(1) + "%";
+        });
+
+        renderizarTabla(clasesFiltradas, data.estudiantes);
+      } catch (error) {
+        console.error("Error cargando los datos de asistencia:", error);
+      }
+    }
+
+    function renderizarTabla(clases, estudiantes) {
+      const cabecera = document.getElementById("cabeceraTabla");
+      const cuerpo = document.getElementById("cuerpoTabla");
+
+      const trCabecera = document.createElement("tr");
+      trCabecera.innerHTML = `<th class="sticky-col">Estudiante</th><th class="sticky-col-2">%</th>` +
+        clases.map(c => `<th>${c}</th>`).join("");
+      cabecera.appendChild(trCabecera);
+
+      estudiantes.forEach(est => {
+        const tr = document.createElement("tr");
+        const celdaNombre = `<td class="sticky-col">${est.nombre}</td>`;
+        const celdaPorcentaje = `<td class="sticky-col-2"><strong>${est.porcentaje}</strong></td>`;
+        const celdasAsistencia = est.filtradas.map(a => `<td class="${a ? 'asistencia-si' : 'asistencia-no'}">${a ? '✔' : '✘'}</td>`).join("");
+        tr.innerHTML = celdaNombre + celdaPorcentaje + celdasAsistencia;
+        cuerpo.appendChild(tr);
+      });
+    }
+
+    window.onload = cargarDatos;
+  </script>
+</body>
+</html>
